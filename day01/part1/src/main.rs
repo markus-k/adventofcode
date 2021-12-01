@@ -2,6 +2,12 @@ use std::fs;
 
 fn main() {
     let contents = fs::read_to_string("input.txt").expect("Reading input file failed");
+    let increase_counter = count_increases(&contents);
+
+    println!("Depth increased {} times.", increase_counter);
+}
+
+fn count_increases(contents: &str) -> usize {
     let mut last_number = 0;
     let mut increase_counter = 0;
 
@@ -15,5 +21,27 @@ fn main() {
         last_number = number;
     }
 
-    println!("Depth increased {} times.", increase_counter);
+    return increase_counter;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_counts_correctly() {
+        let input = "199
+200
+208
+210
+200
+207
+240
+269
+260
+263";
+        let count = count_increases(input);
+
+        assert_eq!(count, 7);
+    }
 }

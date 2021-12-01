@@ -1,9 +1,15 @@
 use std::fs;
 
 fn main() {
+    let contents = fs::read_to_string("input.txt").expect("Reading input file failed");
+    let increase_counter = count_increases_with_moving_average(&contents);
+
+    println!("Depth increased {} times.", increase_counter);
+}
+
+fn count_increases_with_moving_average(contents: &str) -> usize {
     const WINDOW_SIZE: usize = 3;
 
-    let contents = fs::read_to_string("input.txt").expect("Reading input file failed");
     let mut increase_counter = 0;
 
     let mut ringbuf: [i32; WINDOW_SIZE] = [0; WINDOW_SIZE];
@@ -29,5 +35,25 @@ fn main() {
         last_sum = sum;
     }
 
-    println!("Depth increased {} times.", increase_counter);
+    return increase_counter;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_counts_correctly() {
+        let input = "607
+618
+618
+617
+647
+716
+769
+792";
+        let count = count_increases_with_moving_average(input);
+
+        assert_eq!(count, 5);
+    }
 }
