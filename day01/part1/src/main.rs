@@ -1,8 +1,6 @@
-use std::fs;
-
 fn main() {
-    let contents = fs::read_to_string("input.txt").expect("Reading input file failed");
-    let increase_counter = count_increases(&contents);
+    let contents = include_str!("../input.txt");
+    let increase_counter = count_increases(contents);
 
     println!("Depth increased {} times.", increase_counter);
 }
