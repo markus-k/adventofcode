@@ -6,34 +6,17 @@ fn main() {
 }
 
 fn count_increases_with_moving_average(contents: &str) -> usize {
-    const WINDOW_SIZE: usize = 3;
+    let numbers = contents
+        .lines()
+        .map(|line| line.parse().expect("Can't parse line to int"))
+        .collect::<Vec<i32>>();
 
-    let mut increase_counter = 0;
+    let windows = numbers
+        .windows(3)
+        .map(|window| window.iter().sum())
+        .collect::<Vec<i32>>();
 
-    let mut ringbuf: [i32; WINDOW_SIZE] = [0; WINDOW_SIZE];
-    let mut ringbuf_index: usize = 0;
-
-    let mut last_sum = 0;
-
-    for (i, line) in contents.lines().enumerate() {
-        let number: i32 = line.parse().expect("Can't parse line to int");
-
-        ringbuf[ringbuf_index] = number;
-        ringbuf_index += 1;
-        if ringbuf_index >= WINDOW_SIZE {
-            ringbuf_index = 0;
-        }
-
-        let sum = ringbuf.iter().sum();
-
-        if i >= WINDOW_SIZE && sum > last_sum {
-            increase_counter += 1;
-        }
-
-        last_sum = sum;
-    }
-
-    return increase_counter;
+    windows.windows(2).filter(|x| x[1] > x[0]).count()
 }
 
 #[cfg(test)]
