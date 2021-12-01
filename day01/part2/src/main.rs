@@ -22,7 +22,7 @@ fn main() {
 
         let sum = ringbuf.iter().sum();
 
-        if i >= 3 && sum > last_sum {
+        if i >= WINDOW_SIZE && sum > last_sum {
             increase_counter += 1;
         }
 
