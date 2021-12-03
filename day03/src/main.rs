@@ -1,54 +1,108 @@
-fn bools_to_int(most_common: &Vec<bool>) -> u64 {
-    let value = most_common.iter().fold(0, |acc, &b| acc * 2 + b as u64);
+fn main() {
+    let input = include_str!("../input.txt");
+    let report = DiagnosticsReport::from(input);
+
+    println!("Power consumption: {}", report.power_consumption());
+}
+
+fn bools_to_int(bools: &Vec<bool>) -> u64 {
+    let value = bools.iter().fold(0, |acc, &b| acc * 2 + b as u64);
 
     value
 }
 
-fn gamma_rate(most_common: &Vec<bool>) -> u64 {
-    bools_to_int(most_common)
+struct DiagnosticsReport {
+    total_lines: usize,
+    width: usize,
+    parsed: Vec<Vec<bool>>,
 }
 
-fn epsilon_rate(most_common: &Vec<bool>) -> u64 {
-    let inverted = most_common.iter().map(|b| !b).collect::<Vec<bool>>();
+impl From<&str> for DiagnosticsReport {
+    fn from(input: &str) -> Self {
+        let total_lines = input.lines().count();
+        let width = input.lines().next().expect("No first line").len();
+        let parsed = input
+            .lines()
+            .map(|line| {
+                line.chars()
+                    .map(|c| match c {
+                        '1' => true,
+                        '0' => false,
+                        _ => panic!("Illegal character in input."),
+                    })
+                    .collect()
+            })
+            .collect();
 
-    bools_to_int(&inverted)
+        Self {
+            total_lines: total_lines,
+            width: width,
+            parsed: parsed,
+        }
+    }
 }
 
-fn parse_input(input: &str) -> (usize, Vec<bool>) {
-    let width = input.lines().next().expect("No first line").len();
+impl DiagnosticsReport {
+    fn count_bits(&self) -> Vec<usize> {
+        self.parsed
+            .iter()
+            .fold(vec![0; self.width], |counters: Vec<usize>, line| {
+                let new_counters = counters
+                    .iter()
+                    .zip(line)
+                    .map(|(counter, bit)| match bit {
+                        true => counter + 1,
+                        _ => counter + 0,
+                    })
+                    .collect::<Vec<usize>>();
 
-    let (total, counters) = input.lines().fold(
-        (0, vec![0; width]),
-        |(total, counters): (usize, Vec<usize>), line: &str| {
-            let new_counters = counters
-                .iter()
-                .zip(line.chars())
-                .map(|(counter, bit)| match bit {
-                    '1' => counter + 1,
-                    _ => counter + 0,
-                })
-                .collect::<Vec<usize>>();
+                new_counters
+            })
+    }
 
-            (total + 1, new_counters)
-        },
-    );
+    fn find_most_common(&self, tie: bool) -> Vec<bool> {
+        let half = self.total_lines / 2;
+        let counters = self.count_bits();
 
-    let most_common = counters.iter().map(|c| *c > total / 2).collect();
+        counters
+            .iter()
+            .map(|c| if *c == half { tie } else { *c > half })
+            .collect()
+    }
 
-    (total, most_common)
-}
+    fn gamma_rate(&self) -> u64 {
+        let most_common = self.find_most_common(false);
+        bools_to_int(&most_common)
+    }
 
-fn main() {
-    let input = include_str!("../input.txt");
+    fn epsilon_rate(&self) -> u64 {
+        let most_common = self.find_most_common(false);
+        let inverted = most_common.iter().map(|b| !b).collect::<Vec<bool>>();
 
-    let (_total, most_common) = parse_input(input);
+        bools_to_int(&inverted)
+    }
 
-    let gamma = gamma_rate(&most_common);
-    let epsilon = epsilon_rate(&most_common);
+    fn power_consumption(&self) -> u64 {
+        let gamma = self.gamma_rate();
+        let epsilon = self.epsilon_rate();
 
-    println!("Gamma: {}", gamma);
-    println!("Epsilon: {}", epsilon);
-    println!("Product: {}", gamma * epsilon);
+        gamma * epsilon
+    }
+
+    fn oxygen_generator_rating(&self) -> u64 {
+        0
+    }
+
+    fn co2_scrubber_rating(&self) -> u64 {
+        0
+    }
+
+    fn life_support_rating(&self) -> u64 {
+        let o2_generator = self.oxygen_generator_rating();
+        let co2_scrubber = self.co2_scrubber_rating();
+
+        o2_generator * co2_scrubber
+    }
 }
 
 #[cfg(test)]
@@ -69,11 +123,20 @@ mod tests {
 11001
 00010
 01010";
-        let (total, most_common) = parse_input(input);
 
-        assert_eq!(total, 12);
+        let report = DiagnosticsReport::from(input);
 
-        assert_eq!(gamma_rate(&most_common), 22);
-        assert_eq!(epsilon_rate(&most_common), 9);
+        assert_eq!(report.total_lines, 12);
+        assert_eq!(report.width, 5);
+
+        // part1
+        assert_eq!(report.gamma_rate(), 22);
+        assert_eq!(report.epsilon_rate(), 9);
+        assert_eq!(report.power_consumption(), 198);
+
+        // part2
+        assert_eq!(report.oxygen_generator_rating(), 23);
+        assert_eq!(report.co2_scrubber_rating(), 10);
+        assert_eq!(report.life_support_rating(), 230);
     }
 }
