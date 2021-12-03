@@ -3,6 +3,7 @@ fn main() {
     let report = DiagnosticsReport::from(input);
 
     println!("Power consumption: {}", report.power_consumption());
+    println!("Life support rating: {}", report.life_support_rating());
 }
 
 fn bools_to_int(bools: &Vec<bool>) -> u64 {
@@ -12,14 +13,12 @@ fn bools_to_int(bools: &Vec<bool>) -> u64 {
 }
 
 struct DiagnosticsReport {
-    total_lines: usize,
     width: usize,
     parsed: Vec<Vec<bool>>,
 }
 
 impl From<&str> for DiagnosticsReport {
     fn from(input: &str) -> Self {
-        let total_lines = input.lines().count();
         let width = input.lines().next().expect("No first line").len();
         let parsed = input
             .lines()
@@ -35,7 +34,6 @@ impl From<&str> for DiagnosticsReport {
             .collect();
 
         Self {
-            total_lines: total_lines,
             width: width,
             parsed: parsed,
         }
@@ -43,6 +41,13 @@ impl From<&str> for DiagnosticsReport {
 }
 
 impl DiagnosticsReport {
+    fn with_new_data(&self, parsed: Vec<Vec<bool>>) -> Self {
+        Self {
+            width: self.width,
+            parsed,
+        }
+    }
+
     fn count_bits(&self) -> Vec<usize> {
         self.parsed
             .iter()
@@ -52,7 +57,7 @@ impl DiagnosticsReport {
                     .zip(line)
                     .map(|(counter, bit)| match bit {
                         true => counter + 1,
-                        _ => counter + 0,
+                        false => counter + 0,
                     })
                     .collect::<Vec<usize>>();
 
@@ -61,17 +66,18 @@ impl DiagnosticsReport {
     }
 
     fn find_most_common(&self, tie: bool) -> Vec<bool> {
-        let half = self.total_lines / 2;
         let counters = self.count_bits();
+        let total = self.parsed.len();
 
         counters
             .iter()
-            .map(|c| if *c == half { tie } else { *c > half })
+            .map(|c| if total - *c == *c { tie } else { total - *c < *c })
             .collect()
     }
 
     fn gamma_rate(&self) -> u64 {
         let most_common = self.find_most_common(false);
+
         bools_to_int(&most_common)
     }
 
@@ -89,12 +95,42 @@ impl DiagnosticsReport {
         gamma * epsilon
     }
 
+    fn filter_report(&self, criteria: bool) -> Vec<bool> {
+        let mut report = self.with_new_data(self.parsed.to_vec());
+
+        for i in 0..report.width {
+            let mut most_common = report.find_most_common(true);
+            if !criteria {
+                most_common = most_common.iter().map(|a| !a).collect();
+            }
+
+            report = report.with_new_data(
+                report
+                    .parsed
+                    .iter()
+                    .cloned()
+                    .filter(|line| line[i] == most_common[i])
+                    .collect(),
+            );
+
+            if report.parsed.len() == 1 {
+                break;
+            }
+        }
+
+       report.parsed[0].to_vec()
+    }
+
     fn oxygen_generator_rating(&self) -> u64 {
-        0
+        let filtered = self.filter_report(true);
+
+        bools_to_int(&filtered)
     }
 
     fn co2_scrubber_rating(&self) -> u64 {
-        0
+        let filtered = self.filter_report(false);
+
+        bools_to_int(&filtered)
     }
 
     fn life_support_rating(&self) -> u64 {
@@ -126,7 +162,7 @@ mod tests {
 
         let report = DiagnosticsReport::from(input);
 
-        assert_eq!(report.total_lines, 12);
+        assert_eq!(report.parsed.len(), 12);
         assert_eq!(report.width, 5);
 
         // part1
