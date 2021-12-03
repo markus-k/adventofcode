@@ -71,7 +71,13 @@ impl DiagnosticsReport {
 
         counters
             .iter()
-            .map(|c| if total - *c == *c { tie } else { total - *c < *c })
+            .map(|c| {
+                if total - *c == *c {
+                    tie
+                } else {
+                    total - *c < *c
+                }
+            })
             .collect()
     }
 
@@ -118,7 +124,7 @@ impl DiagnosticsReport {
             }
         }
 
-       report.parsed[0].to_vec()
+        report.parsed[0].to_vec()
     }
 
     fn oxygen_generator_rating(&self) -> u64 {
