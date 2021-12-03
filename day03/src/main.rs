@@ -71,11 +71,11 @@ impl DiagnosticsReport {
 
         counters
             .iter()
-            .map(|c| {
-                if total - *c == *c {
+            .map(|&trues| {
+                if total - trues == trues {
                     tie
                 } else {
-                    total - *c < *c
+                    total - trues < trues
                 }
             })
             .collect()
