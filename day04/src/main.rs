@@ -143,19 +143,47 @@ fn parse_input(input: &str) -> (Vec<u32>, Vec<BingoCard>) {
     (drawn_numbers, cards)
 }
 
-fn play(drawn_numbers: Vec<u32>, cards: &mut Vec<BingoCard>) -> Option<(u32, BingoCard)> {
-    for number in drawn_numbers {
+fn play(drawn_numbers: &Vec<u32>, cards: &mut Vec<BingoCard>) -> Option<(u32, BingoCard)> {
+    for &number in drawn_numbers {
         for card in cards.iter_mut() {
             card.mark(number);
 
             let win = card.check_win();
             if win.is_some() {
+                // clone the card because the borrow checker doesn't like me :(
                 return Some((number, card.clone()));
             }
         }
     }
 
     None
+}
+
+fn play_but_let_the_giant_squid_win(
+    drawn_numbers: &Vec<u32>,
+    cards: &mut Vec<BingoCard>,
+) -> Option<(u32, BingoCard)> {
+    let mut last_win: Option<(u32, BingoCard)> = None;
+    let mut boards_that_won: Vec<bool> = vec![false; cards.len()];
+
+    for &number in drawn_numbers {
+        for (has_won, card) in boards_that_won.iter_mut().zip(cards.iter_mut()) {
+            card.mark(number);
+
+            let win = card.check_win();
+            if win.is_some() && !*has_won {
+                *has_won = true;
+                // clone the card because the borrow checker doesn't like me :(
+                last_win = Some((number, card.clone()));
+            }
+        }
+
+        if boards_that_won.iter().all(|&w| w) {
+            break;
+        }
+    }
+
+    last_win
 }
 
 fn calculate_score(winning_number: u32, winning_card: &BingoCard) -> u32 {
@@ -169,13 +197,24 @@ fn main() {
     let input = include_str!("../input.txt");
     let (drawn_numbers, mut cards) = parse_input(input);
 
-    let (winning_number, winning_card) = play(drawn_numbers, &mut cards).expect("No winning card");
-    println!("winning card:");
+    let (winning_number, winning_card) = play(&drawn_numbers, &mut cards).expect("No winning card");
+    println!("Winning card with number {}:", winning_number);
     println!("{}", winning_card);
 
     let score = calculate_score(winning_number, &winning_card);
 
-    println!("Score: {}", score)
+    println!("Score: {}", score);
+
+    println!("Okay, now let's let the squid win a couple times...");
+
+    let (winning_number, winning_card) =
+        play_but_let_the_giant_squid_win(&drawn_numbers, &mut cards).expect("No winning card");
+    println!("Last winning card with number {}:", winning_number);
+    println!("{}", winning_card);
+
+    let score = calculate_score(winning_number, &winning_card);
+
+    println!("Score: {}", score);
 }
 
 #[cfg(test)]
@@ -205,10 +244,10 @@ mod tests {
  2  0 12  3  7";
 
         let (drawn_numbers, mut cards) = parse_input(input);
-        //let mut cards = cards.clone();
 
+        // part1
         let (winning_number, winning_card) =
-            play(drawn_numbers, &mut cards).expect("No winning card");
+            play(&drawn_numbers, &mut cards).expect("No winning card");
 
         println!("winning card:");
         println!("{}", winning_card);
@@ -219,5 +258,19 @@ mod tests {
         assert_eq!(winning_number, 24);
         assert_eq!(unmarked_sum, 188);
         assert_eq!(score, 4512);
+
+        // part2
+        let (winning_number, winning_card) =
+            play_but_let_the_giant_squid_win(&drawn_numbers, &mut cards).expect("No winning card");
+
+        println!("winning card:");
+        println!("{}", winning_card);
+
+        let unmarked_sum = winning_card.numbers_with_mark(false).iter().sum::<u32>();
+        let score = calculate_score(winning_number, &winning_card);
+
+        assert_eq!(winning_number, 13);
+        assert_eq!(unmarked_sum, 148);
+        assert_eq!(score, 1924);
     }
 }
