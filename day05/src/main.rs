@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::HashMap;
+use std::time::Instant;
 
 fn main() {
     let input = include_str!("../input.txt");
@@ -8,7 +9,7 @@ fn main() {
 
     let hv_field = field.with_only_ventkinds_vents(&[VentKind::Horzontal, VentKind::Vertical]);
     let hv_map = VentFieldMap::from(&hv_field);
-    let hv_overlaps = hv_map.points_with_overlap(2).len();
+    let hv_overlaps = hv_map.points_with_overlap(2).count();
     println!("Fields on H/V with at least 2 overlaps: {}", hv_overlaps);
 
     let hvd_field = field.with_only_ventkinds_vents(&[
@@ -16,9 +17,13 @@ fn main() {
         VentKind::Vertical,
         VentKind::Diagonal,
     ]);
+    let start = Instant::now();
     let hvd_map = VentFieldMap::from(&hvd_field);
-    let hvd_overlaps = hvd_map.points_with_overlap(2).len();
+    let duration_map = start.elapsed();
+
+    let hvd_overlaps = hvd_map.points_with_overlap(2).count();
     println!("Fields on H/V/D with at least 2 overlaps: {}", hvd_overlaps);
+    println!("(map generation took {:?})", duration_map);
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -88,38 +93,40 @@ impl Vent {
         }
     }
 
-    fn points_covered(&self) -> Vec<Point> {
+    fn points_covered(&self) -> impl Iterator<Item = Point> {
         if self.kind() == VentKind::Other {
             panic!("Unsupported VentKind");
         }
 
-        let (x_range, x_rev) = if self.0.x <= self.1.x {
-            (((self.0.x)..(self.1.x + 1)), false)
-        } else {
-            (((self.1.x)..(self.0.x + 1)), true)
-        };
+        let (x0, x1) = (self.0.x, self.1.x);
+        let (y0, y1) = (self.0.y, self.1.y);
+        let x_steps = (x1 - x0).abs();
+        let y_steps = (y1 - y0).abs();
 
-        let (y_range, y_rev) = if self.0.y <= self.1.y {
-            (((self.0.y)..(self.1.y + 1)), false)
-        } else {
-            (((self.1.y)..(self.0.y + 1)), true)
-        };
+        let steps = x_steps.max(y_steps);
 
-        // I have the feeling doing this "functional"-style using iterators
-        // just makes things completely unreadable here... rust iterators
-        // can be incredibly annoying
+        (0..(steps + 1)).map(move |step| {
+            let x = if x_steps == 0 {
+                x0
+            } else {
+                if x1 > x0 {
+                    x0 + step
+                } else {
+                    x0 - step
+                }
+            };
+            let y = if y_steps == 0 {
+                y0
+            } else {
+                if y1 > y0 {
+                    y0 + step
+                } else {
+                    y0 - step
+                }
+            };
 
-        let steps = x_range.clone().count().max(y_range.clone().count());
-
-        let points = (0..steps).map(|step| {
-            let x_step = if x_rev { steps - 1 - step } else { step };
-            let x = x_range.clone().cycle().nth(x_step).unwrap();
-            let y_step = if y_rev { steps - 1 - step } else { step };
-            let y = y_range.clone().cycle().nth(y_step).unwrap();
             Point::new(x, y)
-        });
-
-        points.collect()
+        })
     }
 }
 
@@ -169,17 +176,14 @@ impl From<&VentField> for VentFieldMap {
 }
 
 impl VentFieldMap {
-    fn points_with_overlap(&self, overlap: usize) -> Vec<Point> {
-        self.0
-            .iter()
-            .filter_map(|(point, &n)| {
-                if n >= overlap {
-                    Some(point.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
+    fn points_with_overlap(&self, overlap: usize) -> impl Iterator<Item = Point> + '_ {
+        self.0.iter().filter_map(move |(point, &n)| {
+            if n >= overlap {
+                Some(point.clone())
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -211,7 +215,7 @@ mod tests {
             VentKind::Diagonal,
         ]);
         let hvd_map = VentFieldMap::from(&hvd_field);
-        assert_eq!(hvd_map.points_with_overlap(2).len(), 12);
+        assert_eq!(hvd_map.points_with_overlap(2).count(), 12);
     }
 
     #[test]
