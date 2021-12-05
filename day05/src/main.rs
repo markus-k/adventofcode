@@ -207,7 +207,7 @@ mod tests {
         let field = VentField::from(input);
         let hv_field = field.with_only_ventkinds_vents(&[VentKind::Horzontal, VentKind::Vertical]);
         let hv_map = VentFieldMap::from(&hv_field);
-        assert_eq!(hv_map.points_with_overlap(2).len(), 5);
+        assert_eq!(hv_map.points_with_overlap(2).count(), 5);
 
         let hvd_field = field.with_only_ventkinds_vents(&[
             VentKind::Horzontal,
@@ -267,7 +267,7 @@ mod tests {
             let vent = Vent::from(vent);
 
             assert_eq!(vent.kind(), kind);
-            assert_eq!(vent.points_covered(), points);
+            assert_eq!(vent.points_covered().collect::<Vec<Point>>(), points);
         }
     }
 }
