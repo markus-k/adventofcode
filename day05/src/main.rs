@@ -5,12 +5,20 @@ use std::collections::HashMap;
 fn main() {
     let input = include_str!("../input.txt");
     let field = VentField::from(input);
-    let reduced_field = field.with_only_horizontal_or_vertical_vents();
-    let map = VentFieldMap::from(&reduced_field);
 
-    let overlaps = map.points_with_overlap(2).len();
+    let hv_field = field.with_only_ventkinds_vents(&[VentKind::Horzontal, VentKind::Vertical]);
+    let hv_map = VentFieldMap::from(&hv_field);
+    let hv_overlaps = hv_map.points_with_overlap(2).len();
+    println!("Fields on H/V with at least 2 overlaps: {}", hv_overlaps);
 
-    println!("Fields with at least 2 overlaps: {}", overlaps);
+    let hvd_field = field.with_only_ventkinds_vents(&[
+        VentKind::Horzontal,
+        VentKind::Vertical,
+        VentKind::Diagonal,
+    ]);
+    let hvd_map = VentFieldMap::from(&hvd_field);
+    let hvd_overlaps = hvd_map.points_with_overlap(2).len();
+    println!("Fields on H/V/D with at least 2 overlaps: {}", hvd_overlaps);
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -81,37 +89,37 @@ impl Vent {
     }
 
     fn points_covered(&self) -> Vec<Point> {
-        if self.is_horizontal() {
-            let (y0, y1, rev) = if self.0.y < self.1.y {
-                (self.0.y, self.1.y, false)
-            } else {
-                (self.1.y, self.0.y, true)
-            };
-
-            let points = (y0..(y1 + 1)).map(|y| Point::new(self.0.x, y));
-
-            if rev {
-                points.rev().collect()
-            } else {
-                points.collect()
-            }
-        } else if self.is_vertical() {
-            let (x0, x1, rev) = if self.0.x < self.1.x {
-                (self.0.x, self.1.x, false)
-            } else {
-                (self.1.x, self.0.x, true)
-            };
-
-            let points = (x0..(x1 + 1)).map(|x| Point::new(x, self.0.y));
-
-            if rev {
-                points.rev().collect()
-            } else {
-                points.collect()
-            }
-        } else {
-            panic!("Not implemented");
+        if self.kind() == VentKind::Other {
+            panic!("Unsupported VentKind");
         }
+
+        let (x_range, x_rev) = if self.0.x <= self.1.x {
+            (((self.0.x)..(self.1.x + 1)), false)
+        } else {
+            (((self.1.x)..(self.0.x + 1)), true)
+        };
+
+        let (y_range, y_rev) = if self.0.y <= self.1.y {
+            (((self.0.y)..(self.1.y + 1)), false)
+        } else {
+            (((self.1.y)..(self.0.y + 1)), true)
+        };
+
+        // I have the feeling doing this "functional"-style using iterators
+        // just makes things completely unreadable here... rust iterators
+        // can be incredibly annoying
+
+        let steps = x_range.clone().count().max(y_range.clone().count());
+
+        let points = (0..steps).map(|step| {
+            let x_step = if x_rev { steps - 1 - step } else { step };
+            let x = x_range.clone().cycle().nth(x_step).unwrap();
+            let y_step = if y_rev { steps - 1 - step } else { step };
+            let y = y_range.clone().cycle().nth(y_step).unwrap();
+            Point::new(x, y)
+        });
+
+        points.collect()
     }
 }
 
@@ -128,11 +136,11 @@ impl From<&str> for VentField {
 }
 
 impl VentField {
-    fn with_only_horizontal_or_vertical_vents(&self) -> Self {
+    fn with_only_ventkinds_vents(&self, ventkinds: &[VentKind]) -> Self {
         let filtered_vents = self
             .vents
             .iter()
-            .filter(|vent| vent.is_horizontal() || vent.is_vertical())
+            .filter(|vent| ventkinds.contains(&vent.kind()))
             .cloned()
             .collect();
 
@@ -193,10 +201,17 @@ mod tests {
 5,5 -> 8,2";
 
         let field = VentField::from(input);
-        let reduced_field = field.with_only_horizontal_or_vertical_vents();
+        let hv_field = field.with_only_ventkinds_vents(&[VentKind::Horzontal, VentKind::Vertical]);
+        let hv_map = VentFieldMap::from(&hv_field);
+        assert_eq!(hv_map.points_with_overlap(2).len(), 5);
 
-        let map = VentFieldMap::from(&reduced_field);
-        assert_eq!(map.points_with_overlap(2).len(), 5);
+        let hvd_field = field.with_only_ventkinds_vents(&[
+            VentKind::Horzontal,
+            VentKind::Vertical,
+            VentKind::Diagonal,
+        ]);
+        let hvd_map = VentFieldMap::from(&hvd_field);
+        assert_eq!(hvd_map.points_with_overlap(2).len(), 12);
     }
 
     #[test]
@@ -232,6 +247,16 @@ mod tests {
                 "7,7 -> 9,7",
                 vec![Point::new(7, 7), Point::new(8, 7), Point::new(9, 7)],
                 VentKind::Vertical,
+            ),
+            (
+                "1,1 -> 3,3",
+                vec![Point::new(1, 1), Point::new(2, 2), Point::new(3, 3)],
+                VentKind::Diagonal,
+            ),
+            (
+                "9,7 -> 7,9",
+                vec![Point::new(9, 7), Point::new(8, 8), Point::new(7, 9)],
+                VentKind::Diagonal,
             ),
         ];
         for (vent, points, kind) in testcases {
