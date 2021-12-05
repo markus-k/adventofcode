@@ -24,6 +24,8 @@ fn main() {
     let hvd_overlaps = hvd_map.points_with_overlap(2).count();
     println!("Fields on H/V/D with at least 2 overlaps: {}", hvd_overlaps);
     println!("(map generation took {:?})", duration_map);
+
+    hvd_map.visualize();
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -184,6 +186,22 @@ impl VentFieldMap {
                 None
             }
         })
+    }
+
+    fn visualize(&self) {
+        let width = self.0.keys().max_by(|a, b| a.x.cmp(&b.x)).unwrap().x as u32;
+        let height = self.0.keys().max_by(|a, b| a.y.cmp(&b.y)).unwrap().y as u32;
+        let max = *self.0.values().max().unwrap() as f32;
+
+        let img = image::ImageBuffer::from_fn(width, height, |x,y| {
+            if let Some(count) = self.0.get(&Point::new(x as i32,y as i32)) {
+                image::Luma([(((*count as f32) / max) * 255.0) as u8])
+            } else {
+                image::Luma([0u8])
+            }
+        });
+
+        img.save("viz.png");
     }
 }
 
