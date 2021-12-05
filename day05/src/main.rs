@@ -25,6 +25,14 @@ impl Point {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum VentKind {
+    Horzontal,
+    Vertical,
+    Diagonal,
+    Other,
+}
+
 #[derive(Clone, Debug)]
 struct Vent(Point, Point);
 
@@ -50,6 +58,26 @@ impl Vent {
 
     fn is_vertical(&self) -> bool {
         self.0.y == self.1.y
+    }
+
+    fn is_diagonal(&self) -> bool {
+        // a 45° degree diagonal vent has the same number of steps in both directions
+        let steps_x = (self.0.x - self.1.x).abs();
+        let steps_y = (self.0.y - self.1.y).abs();
+
+        steps_x == steps_y
+    }
+
+    fn kind(&self) -> VentKind {
+        if self.is_horizontal() {
+            VentKind::Horzontal
+        } else if self.is_vertical() {
+            VentKind::Vertical
+        } else if self.is_diagonal() {
+            VentKind::Diagonal
+        } else {
+            VentKind::Other
+        }
     }
 
     fn points_covered(&self) -> Vec<Point> {
@@ -183,41 +211,33 @@ mod tests {
     }
 
     #[test]
-    fn test_horizontal_covered_points() {
+    fn test_kind_and_covered_points() {
         let testcases = vec![
             (
                 "1,1 -> 1,3",
                 vec![Point::new(1, 1), Point::new(1, 2), Point::new(1, 3)],
+                VentKind::Horzontal,
             ),
             (
                 "1,3 -> 1,1",
                 vec![Point::new(1, 3), Point::new(1, 2), Point::new(1, 1)],
+                VentKind::Horzontal,
             ),
-        ];
-        for (vent, points) in testcases {
-            let vent = Vent::from(vent);
-
-            assert!(vent.is_horizontal());
-            assert_eq!(vent.points_covered(), points);
-        }
-    }
-
-    #[test]
-    fn test_vertical_covered_points() {
-        let testcases = vec![
             (
                 "9,7 -> 7,7",
                 vec![Point::new(9, 7), Point::new(8, 7), Point::new(7, 7)],
+                VentKind::Vertical,
             ),
             (
                 "7,7 -> 9,7",
                 vec![Point::new(7, 7), Point::new(8, 7), Point::new(9, 7)],
+                VentKind::Vertical,
             ),
         ];
-        for (vent, points) in testcases {
+        for (vent, points, kind) in testcases {
             let vent = Vent::from(vent);
 
-            assert!(vent.is_vertical());
+            assert_eq!(vent.kind(), kind);
             assert_eq!(vent.points_covered(), points);
         }
     }
