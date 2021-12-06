@@ -3,44 +3,60 @@ fn main() {
     let mut sim = LanternFishSim::from(input);
 
     let days = 80;
+    let days2 = 256;
     for _ in 0..days {
         sim.simulate_step();
     }
 
     println!("Fishies after {} days: {}", days, sim.count());
+
+    for _ in days..days2 {
+        sim.simulate_step();
+    }
+
+    println!("Fishies after {} days: {}", days2, sim.count());
 }
+
+const MAX_LIFETIME: usize = 9;
 
 #[derive(Debug)]
 struct LanternFishSim {
-    fishies: Vec<usize>,
+    lifetimes: [u64; MAX_LIFETIME],
 }
 
 impl From<&str> for LanternFishSim {
     fn from(input: &str) -> Self {
-        let fishies = input.split(",").map(|num| num.trim().parse().unwrap()).collect();
+        let mut lifetimes = [0; MAX_LIFETIME];
 
-        LanternFishSim { fishies }
+        for fish in input.split(",") {
+            let lifetime: usize = fish.trim().parse().unwrap();
+
+            lifetimes[lifetime] += 1;
+        }
+
+        LanternFishSim { lifetimes }
     }
 }
 
 impl LanternFishSim {
     fn simulate_step(&mut self) {
-        let mut new_fishies = 0;
-        for fish in self.fishies.iter_mut() {
-            if *fish == 0 {
-                new_fishies += 1;
-                *fish = 6;
-            } else {
-                *fish -= 1;
-            }
-        }
+        let mut lifetimes = self.lifetimes.clone();
 
-        let mut new_fishies = vec![8; new_fishies];
-        self.fishies.append(&mut new_fishies);
+        lifetimes[8] = self.lifetimes[0];
+        lifetimes[7] = self.lifetimes[8];
+        lifetimes[6] = self.lifetimes[0] + self.lifetimes[7];
+        lifetimes[5] = self.lifetimes[6];
+        lifetimes[4] = self.lifetimes[5];
+        lifetimes[3] = self.lifetimes[4];
+        lifetimes[2] = self.lifetimes[3];
+        lifetimes[1] = self.lifetimes[2];
+        lifetimes[0] = self.lifetimes[1];
+
+        self.lifetimes = lifetimes;
     }
 
-    fn count(&self) -> usize {
-        self.fishies.len()
+    fn count(&self) -> u64 {
+        self.lifetimes.iter().sum()
     }
 }
 
@@ -52,25 +68,17 @@ mod tests {
     fn test_example_input() {
         let input = "3,4,3,1,2";
         let mut sim = LanternFishSim::from(input);
-        assert_eq!(sim.fishies, vec![3, 4, 3, 1, 2]);
 
-        let steps = [
-            vec![2, 3, 2, 0, 1],
-            vec![1, 2, 1, 6, 0, 8],
-            vec![0, 1, 0, 5, 6, 7, 8],
-            vec![6, 0, 6, 4, 5, 6, 7, 8, 8],
-            vec![5, 6, 5, 3, 4, 5, 6, 7, 7, 8],
-        ];
-
-        for step in steps.iter() {
-            sim.simulate_step();
-            assert_eq!(&sim.fishies, step);
-        }
-
-        for _ in steps.len()..80 {
+        for _ in 0..80 {
             sim.simulate_step();
         }
 
         assert_eq!(sim.count(), 5934);
+
+        for _ in 80..256 {
+            sim.simulate_step();
+        }
+
+        assert_eq!(sim.count(), 26984457539);
     }
 }
