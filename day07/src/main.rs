@@ -2,12 +2,27 @@ fn main() {
     let input = include_str!("../input.txt");
     let (position, fuel) = find_cheapest_position(input, simple_cost_fn);
 
+    println!("Using a too simple cost function:");
+    println!("Cheapest position: {}", position);
+    println!("Total fuel: {}", fuel);
+
+    let (position, fuel) = find_cheapest_position(input, advanced_cost_fn);
+
+    println!();
+    println!("Using a more advanced cost function:");
     println!("Cheapest position: {}", position);
     println!("Total fuel: {}", fuel);
 }
 
 fn simple_cost_fn(final_pos: usize, current_pos: usize) -> usize {
     (final_pos as i64 - current_pos as i64).abs() as usize
+}
+
+fn advanced_cost_fn(final_pos: usize, current_pos: usize) -> usize {
+    let n = (final_pos as i64 - current_pos as i64).abs() as usize;
+
+    // gauss, could alternatively use (1..(n+1)).sum() (inefficent)
+    (n * n + n) / 2
 }
 
 /// Returns (cheapest_position, total_fuel)
@@ -48,5 +63,10 @@ mod tests {
 
         assert_eq!(position, 2);
         assert_eq!(fuel, 37);
+
+        let (position, fuel) = find_cheapest_position(input, advanced_cost_fn);
+
+        assert_eq!(position, 5);
+        assert_eq!(fuel, 168);
     }
 }
