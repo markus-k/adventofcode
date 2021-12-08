@@ -71,15 +71,6 @@ fn decode_digits(patterns: &Vec<&str>, outputs: &Vec<&str>) -> Vec<u8> {
         vec!['a', 'b', 'c', 'd', 'f', 'g'],
     ];
 
-    /*
-     * for pattern in patterns {
-     *   if guess = guess_number(pattern) {
-     *     segs = SEGMENT_MAP[guess]
-     *
-     *     candidates.enumerate().filter(i not in segs.map(segment_to_index)).
-     *   }
-     * }
-     */
     // map of every actual segment, which segment it could be
     // at the start we have no clue at all, so every actual segment could be
     // any segment from the input
@@ -87,54 +78,34 @@ fn decode_digits(patterns: &Vec<&str>, outputs: &Vec<&str>) -> Vec<u8> {
         .map(|_| vec!['a', 'b', 'c', 'd', 'e', 'f', 'g'])
         .collect();
 
-    //println!("Building map...");
+    // build the candidate map from the 0-9 patterns we got
     for pattern in patterns.iter() {
-        let pattern = pattern.trim();
-
         // check every pattern if it's one we can determine from it's length
         // then remove the corresponding actual segments from all the ones
         // that should be off
-        //
-
-        //print!("Pattern: {}", pattern);
 
         if let Some(num) = guess_number_from_pattern_length(pattern.len()) {
-            //print!(" (guessed: {})", num);
             let actual_segments = &segment_map[num as usize];
 
             for &segment in actual_segments {
-                candidates[segment_to_index(segment)]
-                    .retain(|s| pattern.chars().find(|x| x == s).is_some());
+                // remove anything but these segments from the candidate
+                candidates[segment_to_index(segment)].retain(|&s| pattern.chars().any(|x| x == s));
             }
             for i in 0..7 {
-                if !actual_segments
-                    .iter()
-                    .map(|&segment| segment_to_index(segment))
-                    .collect::<Vec<usize>>()
-                    .contains(&i)
-                {
-                    candidates[i].retain(|s| !pattern.chars().find(|x| x == s).is_some());
+                if !actual_segments.iter().any(|&s| segment_to_index(s) == i) {
+                    // remove segments from all other candidates
+                    candidates[i].retain(|&s| !pattern.chars().any(|x| x == s));
                 }
             }
-        } else {
-            //print!(" (no idea)");
         }
-
-        //println!("");
-        //println!("candidates: {:?}", candidates);
     }
 
-    //println!("Guessing:");
+    // guess the output digits from the candidates we created
     outputs
         .iter()
         .map(|pattern| {
-            let pattern = pattern.trim();
-
-            //print!("Pattern: {}, ", pattern);
-
             if let Some(num) = guess_number_from_pattern_length(pattern.len()) {
-                //print!("easy, it's a {}", num);
-
+                // we can use the same function as before to find "easy" digits
                 num
             } else {
                 // remap actual segments
@@ -151,27 +122,25 @@ fn decode_digits(patterns: &Vec<&str>, outputs: &Vec<&str>) -> Vec<u8> {
                     possible_remaps.push(possible_segments);
                 }
 
-                //println!("possible remaps: {:?}, ", possible_remaps);
-
+                // test all digits (0-9) against our possible remaps
                 let possible_numbers = segment_map
                     .iter()
                     .enumerate()
                     .filter(|(_, segments)| {
-                        //println!("");
-                        //println!("segment: {} {:?}", i, segments);
-
                         if segments.len() != possible_remaps.len() {
+                            // don't even need to try if they are different lengths
                             return false;
                         }
 
                         let mut pr_copy = possible_remaps.clone();
-                        segments.iter().all(|s| {
-                            //println!("all {} in {:?}", s, possible_remaps);
-
+                        // check if the digits segements can be represented with our remaps
+                        segments.iter().all(|segment| {
                             if let Some(i) = pr_copy.iter().position(|pr| {
-                                //println!("   find {} in {:?}", s, pr);
-                                pr.iter().find(|&ps| ps == s).is_some()
+                                // check if the segment is in one of the possible segments
+                                pr.iter().any(|ps| ps == segment)
                             }) {
+                                // found a segment, remove it from our remaps!
+                                // otherwise almost all numbers would fit in some way
                                 pr_copy.remove(i);
                                 true
                             } else {
@@ -181,8 +150,8 @@ fn decode_digits(patterns: &Vec<&str>, outputs: &Vec<&str>) -> Vec<u8> {
                     })
                     .map(|(i, _)| i as u8)
                     .collect::<Vec<u8>>();
-                //println!("possible numbers: {:?}", possible_numbers);
 
+                // let's just assume we found exactly one digit that fits
                 possible_numbers[0]
             }
         })
