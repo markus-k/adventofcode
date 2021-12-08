@@ -109,32 +109,37 @@ fn decode_digits(patterns: &Vec<&str>, outputs: &Vec<&str>) -> Vec<u8> {
                 num
             } else {
                 // remap actual segments
-                let mut possible_remaps: Vec<Vec<char>> = Vec::new();
-
-                for c in pattern.chars() {
-                    // find all possible actual segments
-                    let possible_segments = candidates
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, candidate)| candidate.contains(&c))
-                        .map(|(i, _)| index_to_segment(i))
-                        .collect::<Vec<char>>();
-                    possible_remaps.push(possible_segments);
-                }
+                let possible_remaps = pattern
+                    .chars()
+                    .map(|c| {
+                        // find all possible actual segments
+                        candidates
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, candidate)| {
+                                if candidate.contains(&c) {
+                                    Some(index_to_segment(i))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<char>>()
+                    })
+                    .collect::<Vec<Vec<char>>>();
 
                 // test all digits (0-9) against our possible remaps
                 let possible_numbers = segment_map
                     .iter()
                     .enumerate()
-                    .filter(|(_, segments)| {
+                    .filter_map(|(i, segments)| {
                         if segments.len() != possible_remaps.len() {
                             // don't even need to try if they are different lengths
-                            return false;
+                            return None;
                         }
 
                         let mut pr_copy = possible_remaps.clone();
                         // check if the digits segements can be represented with our remaps
-                        segments.iter().all(|segment| {
+                        if segments.iter().all(|segment| {
                             if let Some(i) = pr_copy.iter().position(|pr| {
                                 // check if the segment is in one of the possible segments
                                 pr.iter().any(|ps| ps == segment)
@@ -146,9 +151,12 @@ fn decode_digits(patterns: &Vec<&str>, outputs: &Vec<&str>) -> Vec<u8> {
                             } else {
                                 false
                             }
-                        })
+                        }) {
+                            Some(i as u8)
+                        } else {
+                            None
+                        }
                     })
-                    .map(|(i, _)| i as u8)
                     .collect::<Vec<u8>>();
 
                 // let's just assume we found exactly one digit that fits
