@@ -22,6 +22,10 @@ fn main() {
         println!();
     }
 
+    println!("All basins marked:");
+    map.display(|p| basins.iter().any(|basin| basin.contains(&p)));
+    println!();
+
     println!(
         "Product of largst three basins: {}",
         map.largest_basin_product(&basins)
