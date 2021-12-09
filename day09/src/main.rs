@@ -5,9 +5,30 @@ fn main() {
 
     let risk_level = map.risk_level(&lowspots);
     println!("RISK LEVEL: {}", risk_level);
+
+    println!("Map:");
+    map.display(|_| false);
+    println!();
+
+    println!("Lowspots marked:");
+    map.display(|p| lowspots.contains(&p));
+    println!();
+
+    let basins = map.find_basins(&lowspots);
+
+    println!("Basins marked:");
+    for basin in basins.iter() {
+        map.display(|p| basin.contains(&p));
+        println!();
+    }
+
+    println!(
+        "Product of largst three basins: {}",
+        map.largest_basin_product(&basins)
+    );
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Point {
     x: usize,
     y: usize,
@@ -70,14 +91,50 @@ impl HeightMap {
             .collect()
     }
 
-    fn explore_from_lowspot(&self, start: &Point) -> Vec<Point> {
-        let points: Vec<Point> = vec![];
+    fn explore_from_lowspot(&self, start: &Point, points: &Vec<Point>) -> Vec<Point> {
+        let mut new_points: Vec<Point> = [(-1isize, 0isize), (1, 0), (0, 1), (0, -1)]
+            .map(|(dy, dx)| ((start.y as isize + dy), (start.x as isize + dx)))
+            .iter()
+            .filter(|(ny, nx)| self.is_in_bounds(*nx, *ny))
+            .filter_map(|(ny, nx)| {
+                let x = *nx as usize;
+                let y = *ny as usize;
+                let val = self.map[y][x];
+                let p = Point::new(x, y);
 
-        points
+                if val != 9 && val > self.map[start.y][start.x] && !points.contains(&p) {
+                    Some(p)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mut recursed_points = new_points
+            .iter()
+            .flat_map(|point| self.explore_from_lowspot(&point, &new_points))
+            .collect::<Vec<Point>>();
+
+        new_points.append(&mut recursed_points);
+        new_points.push(start.clone());
+
+        new_points
     }
 
     fn find_basins(&self, lowspots: &Vec<Point>) -> Vec<Vec<Point>> {
-        vec![]
+        lowspots
+            .iter()
+            .map(|lowspot| {
+                let points: Vec<Point> = vec![lowspot.clone()];
+                let mut new_points = self.explore_from_lowspot(lowspot, &points);
+
+                // this could probably be avoided by being a little smarter up there
+                new_points.sort();
+                new_points.dedup();
+
+                new_points
+            })
+            .collect()
     }
 
     fn risk_level(&self, lowspots: &Vec<Point>) -> u32 {
@@ -85,6 +142,34 @@ impl HeightMap {
             .iter()
             .map(|point| self.map[point.y][point.x] + 1)
             .sum()
+    }
+
+    fn largest_basin_product(&self, basins: &Vec<Vec<Point>>) -> usize {
+        let mut sizes = basins
+            .iter()
+            .map(|basin| basin.len())
+            .collect::<Vec<usize>>();
+
+        sizes.sort_by(|a, b| b.cmp(a));
+
+        sizes[0..3].iter().product()
+    }
+
+    fn display<F>(&self, mark: F)
+    where
+        F: Fn(Point) -> bool,
+    {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                if mark(Point::new(x, y)) {
+                    print!("*");
+                } else {
+                    print!("{}", self.map[y][x]);
+                }
+            }
+
+            println!()
+        }
     }
 }
 
@@ -104,5 +189,25 @@ mod tests {
         let risk_level = map.risk_level(&lowspots);
 
         assert_eq!(risk_level, 15);
+
+        println!("Map:");
+        map.display(|_| false);
+        println!();
+
+        println!("Lowspots marked:");
+        map.display(|p| lowspots.contains(&p));
+        println!();
+
+        let basins = map.find_basins(&lowspots);
+
+        println!("Basins marked:");
+        for basin in basins.iter() {
+            map.display(|p| basin.contains(&p));
+            println!();
+        }
+
+        println!("{:?}", basins);
+
+        assert_eq!(map.largest_basin_product(&basins), 1134);
     }
 }
