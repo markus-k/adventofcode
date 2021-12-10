@@ -1,3 +1,17 @@
+fn main() {
+    let input = include_str!("../input.txt");
+
+    let ship = dive::<ShipPosition>(input);
+
+    println!("Final position: {:?}", ship);
+    println!("Position product: {}", ship.product());
+
+    let ship = dive::<ShipPositionWithAim>(input);
+
+    println!("Final position: {:?}", ship);
+    println!("Position product: {}", ship.product());
+}
+
 #[derive(Debug, PartialEq)]
 enum Command {
     Foward(i64),
@@ -19,14 +33,52 @@ impl From<&str> for Command {
     }
 }
 
+trait Ship {
+    fn new() -> Self;
+    fn product(&self) -> i64;
+    fn run_command(&mut self, cmd: Command);
+    fn run_commands(&mut self, cmds: impl Iterator<Item = Command>) {
+        for cmd in cmds {
+            self.run_command(cmd);
+        }
+    }
+}
+
 #[derive(Debug)]
 struct ShipPosition {
+    horizontal: i64,
+    depth: i64,
+}
+
+impl Ship for ShipPosition {
+    fn new() -> Self {
+        Self {
+            horizontal: 0,
+            depth: 0,
+        }
+    }
+
+    fn product(&self) -> i64 {
+        self.horizontal * self.depth
+    }
+
+    fn run_command(&mut self, cmd: Command) {
+        match cmd {
+            Command::Foward(amount) => self.horizontal += amount,
+            Command::Down(amount) => self.depth += amount,
+            Command::Up(amount) => self.depth -= amount,
+        };
+    }
+}
+
+#[derive(Debug)]
+struct ShipPositionWithAim {
     horizontal: i64,
     depth: i64,
     aim: i64,
 }
 
-impl ShipPosition {
+impl Ship for ShipPositionWithAim {
     fn new() -> Self {
         Self {
             horizontal: 0,
@@ -44,35 +96,20 @@ impl ShipPosition {
             Command::Foward(amount) => {
                 self.horizontal += amount;
                 self.depth += self.aim * amount;
-            },
+            }
             Command::Down(amount) => self.aim += amount,
             Command::Up(amount) => self.aim -= amount,
         };
     }
-
-    fn run_commands(&mut self, cmds: impl Iterator<Item = Command>) {
-        for cmd in cmds {
-            self.run_command(cmd);
-        }
-    }
 }
 
-fn dive(input: &str) -> ShipPosition {
+fn dive<T: Ship>(input: &str) -> T {
     let commands = input.lines().map(|line| Command::from(line));
 
-    let mut ship = ShipPosition::new();
+    let mut ship = T::new();
     ship.run_commands(commands);
 
     ship
-}
-
-fn main() {
-    let input = include_str!("../input.txt");
-
-    let ship = dive(input);
-
-    println!("Final position: {:?}", ship);
-    println!("Position product: {}", ship.product());
 }
 
 #[cfg(test)]
@@ -94,8 +131,12 @@ forward 8
 up 3
 down 8
 forward 2";
-        let ship = dive(input);
+        let ship = dive::<ShipPosition>(input);
+        assert_eq!(ship.horizontal, 15);
+        assert_eq!(ship.depth, 10);
+        assert_eq!(ship.product(), 150);
 
+        let ship = dive::<ShipPositionWithAim>(input);
         assert_eq!(ship.horizontal, 15);
         assert_eq!(ship.depth, 60);
         assert_eq!(ship.product(), 900);
