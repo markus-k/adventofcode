@@ -201,7 +201,7 @@ impl VentFieldMap {
             }
         });
 
-        img.save("viz.png");
+        img.save("viz.png").unwrap();
     }
 }
 
