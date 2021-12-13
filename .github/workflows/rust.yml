@@ -17,6 +17,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: set -e; for day in day*; do cargo build --manifest-path $day/Cargo.toml --verbose; done
+      run: set -e; for day in day*; do if [ -f "$day/Cargo.toml" ]; then cargo build --manifest-path $day/Cargo.toml --verbose; fi; done
     - name: Run tests
-      run: set -e; for day in day*; do cargo test --manifest-path $day/Cargo.toml --verbose; done
+      run: set -e; for day in day*; do if [ -f "$day/Cargo.toml" ]; then cargo test --manifest-path $day/Cargo.toml --verbose; fi; done
