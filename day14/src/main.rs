@@ -7,6 +7,9 @@ fn main() {
     let max = counts.values().max().unwrap();
     let min = counts.values().min().unwrap();
     println!("{} - {} = {}", max, min, max - min);
+
+    let count = part2(input, 40);
+    println!("After 40 steps: {}", count);
 }
 
 fn apply_rules(template: &str, rules: &[(&str, &str)]) -> String {
@@ -49,9 +52,75 @@ fn parse_input(input: &str, steps: usize) -> String {
     for i in 0..steps {
         polymer = apply_rules(&polymer, &rules);
     }
-    println!("{}", polymer);
 
     polymer
+}
+
+fn part2(input: &str, steps: usize) -> i64 {
+    let (template, rules) = input.split_once("\n\n").unwrap();
+
+    let rules = rules
+        .lines()
+        .map(|line| line.split_once(" -> ").unwrap())
+        .collect::<Vec<(&str, &str)>>();
+
+    let mut pairs: HashMap<String, i64> = HashMap::new();
+    for i in 0..(template.len() - 1) {
+        pairs
+            .entry(template[i..i + 2].into())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
+    }
+
+    for i in 0..steps {
+        let mut changes: HashMap<String, i64> = HashMap::new();
+
+        for &(rule, insertee) in rules.iter() {
+            if *pairs.entry(rule.into()).or_default() > 0 {
+                let count = pairs[rule];
+                changes
+                    .entry(rule.into())
+                    .and_modify(|c| *c -= count)
+                    .or_insert(-1 * count);
+
+                let np1: String = format!("{}{}", &rule[0..1], insertee);
+                let np2: String = format!("{}{}", insertee, &rule[1..2]);
+                changes
+                    .entry(np1)
+                    .and_modify(|c| *c += count)
+                    .or_insert(count);
+                changes
+                    .entry(np2)
+                    .and_modify(|c| *c += count)
+                    .or_insert(count);
+            }
+        }
+
+        for (pair, delta) in changes.into_iter() {
+            pairs
+                .entry(pair)
+                .and_modify(|c| *c += delta)
+                .or_insert(delta);
+        }
+    }
+
+    let mut counts: HashMap<char, i64> = HashMap::new();
+    for (pair, count) in pairs.iter() {
+        for i in [0, 1] {
+            let c = pair.chars().nth(i).unwrap();
+            counts
+                .entry(c)
+                .and_modify(|c| *c += count)
+                .or_insert(*count);
+        }
+    }
+
+    counts = counts
+        .iter()
+        .map(|(c, count)| (*c, (*count + 1) / 2))
+        .collect();
+
+    counts.values().max().unwrap() - counts.values().min().unwrap()
 }
 
 #[cfg(test)]
@@ -84,5 +153,10 @@ CN -> C";
         let max = counts.values().max().unwrap();
         let min = counts.values().min().unwrap();
         println!("{} - {} = {}", max, min, max - min);
+
+        assert_eq!(max - min, 1588);
+
+        assert_eq!(part2(input, 10), 1588);
+        assert_eq!(part2(input, 40), 2188189693529);
     }
 }
