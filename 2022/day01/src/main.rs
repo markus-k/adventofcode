@@ -20,11 +20,11 @@ fn parse_inventories(input: &str) -> Vec<u32> {
     calories
 }
 
-fn max_calories(calories: &Vec<u32>) -> u32 {
+fn max_calories(calories: &[u32]) -> u32 {
     *calories.last().unwrap()
 }
 
-fn top3_calories(calories: &Vec<u32>) -> u32 {
+fn top3_calories(calories: &[u32]) -> u32 {
     calories.iter().rev().take(3).sum()
 }
 
