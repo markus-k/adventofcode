@@ -8,7 +8,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("part1", |b| {
         b.iter(|| find_fully_contained(black_box(input)))
     });
-    c.bench_function("part1", |b| b.iter(|| find_overlapping(black_box(input))));
+    c.bench_function("part2", |b| b.iter(|| find_overlapping(black_box(input))));
 }
 
 criterion_group!(benches, criterion_benchmark);

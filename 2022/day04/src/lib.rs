@@ -1,11 +1,5 @@
 use std::ops::RangeInclusive;
 
-fn parse_sections(sections: &str) -> Option<RangeInclusive<u32>> {
-    let (start, end) = sections.split_once('-')?;
-
-    Some((start.parse().unwrap())..=(end.parse().unwrap()))
-}
-
 trait ContainsRange {
     fn fully_contains_range(&self, other: &Self) -> bool;
     fn overlaps_range(&self, other: &Self) -> bool;
@@ -30,8 +24,13 @@ fn parse_input(
 ) -> impl Iterator<Item = (RangeInclusive<u32>, RangeInclusive<u32>)> + '_ {
     input
         .lines()
-        .filter_map(|line| line.split_once(','))
-        .filter_map(|(first, second)| Some((parse_sections(first)?, parse_sections(second)?)))
+        .map(|line| line.split(&['-', ',']))
+        .filter_map(|mut split| {
+            Some((
+                split.next()?.parse::<u32>().ok()?..=split.next()?.parse::<u32>().ok()?,
+                split.next()?.parse::<u32>().ok()?..=split.next()?.parse::<u32>().ok()?,
+            ))
+        })
 }
 
 pub fn find_fully_contained(input: &str) -> usize {
