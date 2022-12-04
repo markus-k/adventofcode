@@ -13,23 +13,26 @@ fn main() {
     );
 }
 
-fn parse_sections(sections: &str) -> RangeInclusive<u32> {
-    let (start, end) = sections.split_once('-').unwrap();
+fn parse_sections(sections: &str) -> Option<RangeInclusive<u32>> {
+    let (start, end) = sections.split_once('-')?;
 
-    (start.parse().unwrap())..=(end.parse().unwrap())
+    Some((start.parse().unwrap())..=(end.parse().unwrap()))
 }
 
 trait ContainsRange {
-    fn fully_contains_range(&self, other: &RangeInclusive<u32>) -> bool;
-    fn overlaps_range(&self, other: &RangeInclusive<u32>) -> bool;
+    fn fully_contains_range(&self, other: &Self) -> bool;
+    fn overlaps_range(&self, other: &Self) -> bool;
 }
 
-impl ContainsRange for RangeInclusive<u32> {
-    fn fully_contains_range(&self, other: &RangeInclusive<u32>) -> bool {
+impl<U> ContainsRange for RangeInclusive<U>
+where
+    U: PartialOrd<U>,
+{
+    fn fully_contains_range(&self, other: &Self) -> bool {
         other.start() >= self.start() && other.end() <= self.end()
     }
 
-    fn overlaps_range(&self, other: &RangeInclusive<u32>) -> bool {
+    fn overlaps_range(&self, other: &Self) -> bool {
         (other.start() >= self.start() && other.start() <= self.end())
             || (other.end() <= self.end() && other.end() >= self.start())
     }
@@ -41,7 +44,7 @@ fn parse_input(
     input
         .lines()
         .filter_map(|line| line.split_once(','))
-        .map(|(first, second)| (parse_sections(first), parse_sections(second)))
+        .filter_map(|(first, second)| Some((parse_sections(first)?, parse_sections(second)?)))
 }
 
 fn find_fully_contained(input: &str) -> usize {
