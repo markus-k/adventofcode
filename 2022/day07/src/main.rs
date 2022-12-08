@@ -28,13 +28,10 @@ fn parse_command<'a>(cli: &'a str) -> Command<'a> {
 }
 
 fn parse_input<'a>(input: &'a str) -> HashMap<String, usize> {
-    let lines = input.lines().peekable();
-
     let mut paths: HashMap<String, usize> = HashMap::new();
-
     let mut current_path = Vec::<&str>::new();
 
-    for line in lines {
+    for line in input.lines() {
         if line.starts_with('$') {
             let cmd = parse_command(line);
             match cmd {
@@ -53,6 +50,7 @@ fn parse_input<'a>(input: &'a str) -> HashMap<String, usize> {
                 let size = size.parse::<usize>().unwrap();
 
                 for p in 0..(current_path.len() + 1) {
+                    // add the size to all parent directories as well
                     let path = current_path[..p].join("/").to_string();
 
                     paths.entry(path).and_modify(|s| *s += size).or_insert(size);
