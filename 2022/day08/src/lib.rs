@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::{collections::HashSet, ops::Index};
 
 use take_until::TakeUntilExt;
 
@@ -10,7 +10,8 @@ pub struct Map2D<T> {
 
 impl<T> Map2D<T> {
     #[inline]
-    pub fn get(&self, x: usize, y: usize) -> Option<&T> {
+    pub fn get_unchecked(&self, x: usize, y: usize) -> Option<&T> {
+        // bounds check introduces a ~6% performance penalty
         self.map.get(y * self.height + x)
     }
 
@@ -66,7 +67,7 @@ impl<T> Index<(usize, usize)> for Map2D<T> {
 
     #[inline]
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        &self.get(index.0, index.1).unwrap()
+        &self.get_unchecked(index.0, index.1).unwrap()
     }
 }
 
@@ -80,27 +81,57 @@ pub fn parse_input(input: &str) -> TreeMap {
 }
 
 pub fn visible_trees(map: &TreeMap) -> usize {
-    let mut trees = 0;
-
     let y_len = map.height();
     let x_len = map.width();
 
-    // this is quite the bad algorithm
-    for y in 1..(y_len - 1) {
-        for x in 1..(x_len - 1) {
-            let tree = map[(x, y)];
+    // worst case all trees are visible, so allocate width*height
+    let mut visible = HashSet::<(usize, usize)>::with_capacity(x_len * y_len);
 
-            if (0..x).all(|x1| map[(x1, y)] < tree)
-                || ((x + 1)..x_len).all(|x1| map[(x1, y)] < tree)
-                || (0..y).all(|y1| map[(x, y1)] < tree)
-                || ((y + 1)..y_len).all(|y1| map[(x, y1)] < tree)
-            {
-                trees += 1;
-            }
+    #[inline]
+    fn check(
+        x: usize,
+        y: usize,
+        mut highest: u8,
+        map: &TreeMap,
+        visible: &mut HashSet<(usize, usize)>,
+    ) -> u8 {
+        let tree = map[(x, y)];
+        if tree > highest {
+            highest = tree;
+            visible.insert((x, y));
+        }
+        highest
+    }
+
+    for y in 1..(y_len - 1) {
+        // from left
+        let mut highest = map[(0, y)];
+        for x in 1..(x_len - 1) {
+            highest = check(x, y, highest, map, &mut visible);
+        }
+
+        // from right
+        let mut highest = map[(x_len - 1, y)];
+        for x in (1..(x_len - 1)).rev() {
+            highest = check(x, y, highest, map, &mut visible);
         }
     }
 
-    trees + y_len * 2 + x_len * 2 - 4
+    for x in 1..(x_len - 1) {
+        // from top
+        let mut highest = map[(x, 0)];
+        for y in 1..(y_len - 1) {
+            highest = check(x, y, highest, map, &mut visible);
+        }
+
+        // from bottom
+        let mut highest = map[(x, y_len - 1)];
+        for y in (1..(y_len - 1)).rev() {
+            highest = check(x, y, highest, map, &mut visible);
+        }
+    }
+
+    visible.len() + y_len * 2 + x_len * 2 - 4
 }
 
 pub fn best_score(map: &TreeMap) -> usize {
