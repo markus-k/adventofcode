@@ -81,12 +81,20 @@ pub fn part1<I: Iterator<Item = Direction>>(iter: I) -> usize {
         tail_positions.insert(tail);
     }
 
-    //print_tail(&tail_positions);
-
     tail_positions.len()
 }
 
 pub fn part2<I: Iterator<Item = Direction>>(iter: I) -> usize {
+    part2_viz(iter, |_, _, _| {})
+}
+
+pub fn part2_viz<
+    I: Iterator<Item = Direction>,
+    SF: FnMut((isize, isize), &[(isize, isize)], &HashSet<(isize, isize)>),
+>(
+    iter: I,
+    mut after_step: SF,
+) -> usize {
     const N: usize = 9;
     let mut head = (0, 0);
     let mut tail = [(0, 0); N];
@@ -101,13 +109,10 @@ pub fn part2<I: Iterator<Item = Direction>>(iter: I) -> usize {
             tail[i] = step_tail(tail[i - 1], tail[i]);
         }
 
-        //print_rope(head, &tail);
-        //println!();
-
         tail_positions.insert(tail[N - 1]);
-    }
 
-    //print_tail(&tail_positions);
+        after_step(head, &tail, &tail_positions)
+    }
 
     tail_positions.len()
 }
@@ -125,36 +130,35 @@ fn grid_size<I: Iterator<Item = (isize, isize)>>(iter: I) -> ((isize, isize), (i
     )
 }
 
-fn print_grid<P: Fn(isize, isize) -> char>(size: ((isize, isize), (isize, isize)), f: P) {
+fn print_grid<P: Fn(isize, isize) -> char, W: std::io::Write>(
+    w: &mut W,
+    size: ((isize, isize), (isize, isize)),
+    f: P,
+) {
     for row in (size.0 .1..(size.1 .1 + 1)).rev() {
         for col in size.0 .0..(size.1 .0 + 1) {
-            print!("{}", f(col, row));
+            write!(w, "{}", f(col, row)).unwrap();
         }
-        println!();
+        writeln!(w).unwrap();
     }
 }
 
-fn print_tail(tail_positions: &HashSet<(isize, isize)>) {
-    let size = grid_size(tail_positions.iter().copied());
+pub fn print_rope<W: std::io::Write>(
+    w: &mut W,
+    head: (isize, isize),
+    tail: &[(isize, isize)],
+    tail_positions: &HashSet<(isize, isize)>,
+) {
+    let size = grid_size(
+        std::iter::once(head)
+            .chain(tail.iter().copied())
+            .chain(tail_positions.iter().copied()),
+    );
 
-    println!("{size:?}");
-
-    print_grid(size, |col, row| {
+    print_grid(w, size, |col, row| {
         if col == 0 && row == 0 {
             's'
-        } else if tail_positions.contains(&(col, row)) {
-            '#'
-        } else {
-            '.'
-        }
-    });
-}
-
-fn print_rope(head: (isize, isize), tail: &[(isize, isize)]) {
-    let size = grid_size(std::iter::once(head).chain(tail.iter().copied()));
-
-    print_grid(size, |col, row| {
-        if (col, row) == head {
+        } else if (col, row) == head {
             'H'
         } else if let Some(tail) = tail
             .iter()
@@ -163,6 +167,8 @@ fn print_rope(head: (isize, isize), tail: &[(isize, isize)]) {
             .map(|(i, _)| i)
         {
             (tail + 1).to_string().chars().next().unwrap()
+        } else if tail_positions.contains(&(col, row)) {
+            '#'
         } else {
             '.'
         }
