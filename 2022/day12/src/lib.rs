@@ -43,6 +43,19 @@ impl Map {
         })
     }
 
+    pub fn neighbors_forward(
+        &self,
+        x: usize,
+        y: usize,
+    ) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.neighbors(x, y).filter(move |(nx, ny)| {
+            let prev = self.get(x, y);
+            let new = self.get(*nx, *ny);
+
+            new <= prev + 1
+        })
+    }
+
     pub fn neighbors_backward(
         &self,
         x: usize,
@@ -94,7 +107,11 @@ impl FromStr for Map {
     }
 }
 
-pub fn bfs(map: &Map, start: (usize, usize), end: (usize, usize)) -> usize {
+pub fn bfs<SI: Iterator<Item = (usize, usize)>>(
+    map: &Map,
+    start_iter: SI,
+    end: (usize, usize),
+) -> usize {
     let (width, height) = map.size();
     let mut prev = vec![vec![None::<(usize, usize)>; width]; height];
     let mut q = VecDeque::<(usize, usize)>::new();
@@ -102,14 +119,16 @@ pub fn bfs(map: &Map, start: (usize, usize), end: (usize, usize)) -> usize {
 
     let mut goal = None::<(usize, usize)>;
 
-    q.push_back(start);
-    explored[start.1][start.0] = true;
+    for start in start_iter {
+        q.push_back(start);
+        explored[start.1][start.0] = true;
+    }
 
     while let Some(v) = q.pop_front() {
         if v == end {
             goal = Some(v);
         }
-        for w in map.neighbors_backward(v.0, v.1) {
+        for w in map.neighbors_forward(v.0, v.1) {
             if !explored[w.1][w.0] {
                 explored[w.1][w.0] = true;
                 prev[w.1][w.0] = Some(v);
@@ -137,23 +156,20 @@ pub fn parse_input(input: &str) -> Map {
 }
 
 pub fn part1(map: &Map) -> usize {
-    bfs(map, map.end(), map.start())
+    bfs(map, std::iter::once(map.start()), map.end())
 }
 
 pub fn part2(map: &Map) -> usize {
-    // this is stupid and i shall be punished (but it works)
-    let mut shortest = map
-        .map
-        .iter()
-        .enumerate()
-        .flat_map(|(y, row)| row.iter().enumerate().map(move |(x, v)| ((x, y), v)))
-        .filter(|((_x, _y), &v)| v == 0)
-        .map(|((x, y), _)| (x, y))
-        .map(|(x, y)| bfs(map, map.end(), (x, y)))
-        .collect::<Vec<_>>();
-    shortest.sort();
-
-    *shortest.iter().filter(|&s| *s > 0).next().unwrap()
+    bfs(
+        map,
+        map.map
+            .iter()
+            .enumerate()
+            .flat_map(|(y, row)| row.iter().enumerate().map(move |(x, v)| ((x, y), v)))
+            .filter(|((_x, _y), &v)| v == 0)
+            .map(|((x, y), _)| (x, y)),
+        map.end(),
+    )
 }
 
 #[cfg(test)]
