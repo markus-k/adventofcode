@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{collections::VecDeque, str::FromStr};
 
 pub struct Map {
     map: Vec<Vec<u8>>,
@@ -30,25 +30,30 @@ impl Map {
         let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
         let (width, height) = self.size();
 
-        offsets
-            .into_iter()
-            .filter_map(move |(dx, dy)| {
-                if (x == 0 && dx < 0)
-                    || (y == 0 && dy < 0)
-                    || (x == width - 1 && dx > 0)
-                    || (y == height - 1 && dy > 0)
-                {
-                    None
-                } else {
-                    Some((((x as isize + dx) as usize), (y as isize + dy) as usize))
-                }
-            })
-            .filter(move |(nx, ny)| {
-                let prev = self.get(x, y);
-                let new = self.get(*nx, *ny);
+        offsets.into_iter().filter_map(move |(dx, dy)| {
+            if (x == 0 && dx < 0)
+                || (y == 0 && dy < 0)
+                || (x == width - 1 && dx > 0)
+                || (y == height - 1 && dy > 0)
+            {
+                None
+            } else {
+                Some((((x as isize + dx) as usize), (y as isize + dy) as usize))
+            }
+        })
+    }
 
-                new <= prev + 1
-            })
+    pub fn neighbors_backward(
+        &self,
+        x: usize,
+        y: usize,
+    ) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.neighbors(x, y).filter(move |(nx, ny)| {
+            let prev = self.get(x, y);
+            let new = self.get(*nx, *ny);
+
+            new + 1 >= prev
+        })
     }
 }
 
@@ -89,44 +94,42 @@ impl FromStr for Map {
     }
 }
 
-fn dijkstra(map: &Map, start: (usize, usize), end: (usize, usize)) -> usize {
-    let size = map.size();
-    let mut dist = vec![vec![usize::MAX / 2 /* bloody hell */; size.0]; size.1];
-    let mut prev = vec![vec![None::<(usize, usize)>; size.0]; size.1];
-    let mut q = (0..size.0)
-        .flat_map(|x| (0..size.1).map(move |y| (x, y)))
-        .collect::<Vec<_>>();
+pub fn bfs(map: &Map, start: (usize, usize), end: (usize, usize)) -> usize {
+    let (width, height) = map.size();
+    let mut prev = vec![vec![None::<(usize, usize)>; width]; height];
+    let mut q = VecDeque::<(usize, usize)>::new();
+    let mut explored = vec![vec![false; width]; height];
 
-    dist[start.1][start.0] = 0;
+    let mut goal = None::<(usize, usize)>;
 
-    while !q.is_empty() {
-        let (i, u) = q
-            .iter()
-            .enumerate()
-            .min_by_key(|(_i, u)| dist[u.1][u.0])
-            .map(|(i, u)| (i, u.clone()))
-            .unwrap();
-        q.remove(i);
+    q.push_back(start);
+    explored[start.1][start.0] = true;
 
-        for v in map.neighbors(u.0, u.1).filter(|n| q.contains(n)) {
-            let alt = dist[u.1][u.0] + 1;
-            if alt < dist[v.1][v.0] {
-                dist[v.1][v.0] = alt;
-                prev[v.1][v.0] = Some(u.clone());
+    while let Some(v) = q.pop_front() {
+        if v == end {
+            goal = Some(v);
+        }
+        for w in map.neighbors_backward(v.0, v.1) {
+            if !explored[w.1][w.0] {
+                explored[w.1][w.0] = true;
+                prev[w.1][w.0] = Some(v);
+                q.push_back(w);
             }
         }
     }
 
-    let mut s = 0;
-    let mut u = Some(end);
+    if goal.is_some() {
+        let mut pos = goal;
+        let mut steps = 0;
+        while let Some(p) = pos {
+            pos = prev[p.1][p.0];
+            steps += 1;
+        }
 
-    while let Some(up) = u {
-        //s.push(up);
-        s += 1;
-        u = prev.get(up.1).and_then(|v| v.get(up.0)).unwrap().clone();
+        steps - 1
+    } else {
+        usize::MAX
     }
-
-    s - 1
 }
 
 pub fn parse_input(input: &str) -> Map {
@@ -134,7 +137,7 @@ pub fn parse_input(input: &str) -> Map {
 }
 
 pub fn part1(map: &Map) -> usize {
-    dijkstra(map, map.start(), map.end())
+    bfs(map, map.end(), map.start())
 }
 
 pub fn part2(map: &Map) -> usize {
@@ -146,7 +149,7 @@ pub fn part2(map: &Map) -> usize {
         .flat_map(|(y, row)| row.iter().enumerate().map(move |(x, v)| ((x, y), v)))
         .filter(|((_x, _y), &v)| v == 0)
         .map(|((x, y), _)| (x, y))
-        .map(|(x, y)| dijkstra(map, (x, y), map.end()))
+        .map(|(x, y)| bfs(map, map.end(), (x, y)))
         .collect::<Vec<_>>();
     shortest.sort();
 
