@@ -1,18 +1,99 @@
+#[cfg(all(feature = "nom-parser", feature = "json-parser"))]
+compile_error!(
+    "feature \"nom-parser\" and feature \"json-parser\" cannot be enabled at the same time"
+);
+
+#[cfg(not(any(feature = "nom-parser", feature = "json-parser")))]
+compile_error!("at least one parser has to be enabled");
+
 use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
 #[derive(Clone, Debug)]
 pub enum Value {
-    Integer(u64),
+    Integer(u8),
     List(Vec<Value>),
+}
+
+#[cfg(feature = "nom-parser")]
+mod nom_parser {
+    use nom::{
+        branch::alt,
+        character::streaming::char,
+        combinator::{cut, map},
+        error::make_error,
+        multi::separated_list0,
+        sequence::{preceded, terminated},
+        IResult,
+    };
+
+    use super::Value;
+
+    fn parse_number(input: &str) -> IResult<&str, u8> {
+        if input.len() < 1 {
+            Err(nom::Err::Error(make_error(
+                input,
+                nom::error::ErrorKind::Eof,
+            )))
+        } else {
+            let number_end = input.as_bytes().iter().position(|c| !c.is_ascii_digit());
+
+            if let Some(end) = number_end {
+                let (num_str, rem) = input.split_at(end);
+
+                if num_str.is_empty() {
+                    Err(nom::Err::Error(make_error(
+                        input,
+                        nom::error::ErrorKind::Digit,
+                    )))
+                } else {
+                    Ok((rem, num_str.parse().unwrap()))
+                }
+            } else {
+                Err(nom::Err::Error(make_error(
+                    input,
+                    nom::error::ErrorKind::Digit,
+                )))
+            }
+        }
+    }
+
+    fn parse_list(input: &str) -> IResult<&str, Vec<Value>> {
+        preceded(
+            char('['),
+            cut(terminated(
+                separated_list0(char(','), parse_value),
+                char(']'),
+            )),
+        )(input)
+    }
+
+    fn parse_value(input: &str) -> IResult<&str, Value> {
+        alt((
+            map(parse_number, Value::Integer),
+            map(parse_list, Value::List),
+        ))(input)
+    }
+
+    pub fn parse_signal(input: &str) -> Value {
+        parse_value(input).unwrap().1
+    }
 }
 
 impl FromStr for Value {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let v = serde_json::from_str::<serde_json::Value>(s).unwrap();
+        #[cfg(feature = "nom-parser")]
+        {
+            Ok(nom_parser::parse_signal(s))
+        }
 
-        Ok(Self::from_json(v))
+        #[cfg(feature = "json-parser")]
+        {
+            let v = serde_json::from_str::<serde_json::Value>(s).unwrap();
+
+            Ok(Self::from_json(v))
+        }
     }
 }
 
@@ -37,9 +118,10 @@ impl Display for Value {
 }
 
 impl Value {
+    #[cfg(feature = "json-parser")]
     fn from_json(json: serde_json::Value) -> Self {
         match json {
-            serde_json::Value::Number(num) => Self::Integer(num.as_u64().unwrap()),
+            serde_json::Value::Number(num) => Self::Integer(num.as_u64().unwrap() as u8),
             serde_json::Value::Array(arr) => {
                 Self::List(arr.into_iter().map(Value::from_json).collect())
             }
@@ -61,7 +143,7 @@ impl Value {
 }
 
 impl PartialOrd<Self> for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
