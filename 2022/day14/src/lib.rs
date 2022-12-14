@@ -1,34 +1,77 @@
-use std::ops::Range;
+use std::{collections::HashSet, ops::RangeInclusive};
 
 const SAND_SOURCE: (usize, usize) = (500, 0);
 const FLOOR_OFFSET: usize = 2;
 
-type Lines = Vec<Vec<(usize, usize)>>;
-
 #[derive(Debug)]
-struct SandSimulator<'a> {
-    walls: &'a Lines,
-    settled: Vec<(usize, usize)>,
+struct SandSimulator {
+    settled: HashSet<(usize, usize)>,
+
+    wall_bounds: (RangeInclusive<usize>, RangeInclusive<usize>),
+    obstacle_map: Vec<bool>,
+    obstacle_map_size: (usize, usize),
 }
 
-impl<'a> SandSimulator<'a> {
-    pub fn new(walls: &'a Lines) -> Self {
+impl SandSimulator {
+    pub fn new(walls: &[Vec<(usize, usize)>]) -> Self {
+        let wall_bounds = wall_bounds(walls);
+        let wall_bounds = (
+            wall_bounds.0 .0..=wall_bounds.0 .1,
+            wall_bounds.1 .0..=wall_bounds.1 .1,
+        );
+        let obstacle_map_size = (
+            wall_bounds.0.end() - wall_bounds.0.start() + 1,
+            wall_bounds.1.end() - wall_bounds.1.start() + 1,
+        );
+
+        let mut obstacle_map = vec![false; obstacle_map_size.0 * obstacle_map_size.1];
+        for wall in walls {
+            for wd in wall.windows(2) {
+                if wd[0].0 == wd[1].0 {
+                    // vertical
+                    for y in wd[0].1.min(wd[1].1)..=(wd[1].1.max(wd[0].1) + 0) {
+                        obstacle_map[calc_obstacle_map_index(
+                            obstacle_map_size,
+                            &wall_bounds,
+                            (wd[0].0, y),
+                        )] = true;
+                    }
+                } else if wd[0].1 == wd[1].1 {
+                    // horizontal
+                    for x in wd[0].0.min(wd[1].0)..=(wd[1].0.max(wd[0].0) + 0) {
+                        obstacle_map[calc_obstacle_map_index(
+                            obstacle_map_size,
+                            &wall_bounds,
+                            (x, wd[0].1),
+                        )] = true;
+                    }
+                } else {
+                    panic!("Only vertical and horizontal walls are supported");
+                }
+            }
+        }
+
         Self {
-            walls,
-            settled: Vec::new(),
+            settled: HashSet::new(),
+            wall_bounds,
+            obstacle_map,
+            obstacle_map_size,
         }
     }
 
     pub fn render<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
-        let bounds = self.settled.iter().fold(self.wall_bounds(), |acc, point| {
-            (
-                (acc.0 .0.min(point.0), acc.0 .1.max(point.0)),
-                (acc.1 .0.min(point.1), acc.1 .1.max(point.1)),
-            )
-        });
+        let bounds = self
+            .settled
+            .iter()
+            .fold(self.wall_bounds.clone(), |acc, point| {
+                (
+                    (*(acc.0.start()).min(&point.0)..=*(acc.0.end()).max(&point.0)),
+                    (*(acc.1.start()).min(&point.1)..=*(acc.1.end()).max(&point.1)),
+                )
+            });
 
-        for y in bounds.1 .0..=(bounds.1 .1 + FLOOR_OFFSET) {
-            for x in bounds.0 .0..=bounds.0 .1 {
+        for y in 0..=(bounds.1.end() + FLOOR_OFFSET) {
+            for x in bounds.0.clone() {
                 if (x, y) == SAND_SOURCE {
                     write!(w, "+")?;
                 } else if self.settled.contains(&(x, y)) {
@@ -36,7 +79,7 @@ impl<'a> SandSimulator<'a> {
                 } else if self.point_is_wall((x, y)) {
                     write!(w, "#")?;
                 } else if y == self.floor_y() {
-                    write!(w, "#")?;
+                    write!(w, "=")?;
                 } else {
                     write!(w, ".")?;
                 }
@@ -49,7 +92,6 @@ impl<'a> SandSimulator<'a> {
 
     pub fn drop_sand(&mut self, stop_out_of_wall_bounds: bool) -> bool {
         let mut sand = SAND_SOURCE;
-        let bounds = self.wall_bounds();
 
         loop {
             let candidates = [
@@ -58,7 +100,7 @@ impl<'a> SandSimulator<'a> {
                 (sand.0 + 1, sand.1 + 1),
             ];
 
-            if stop_out_of_wall_bounds && sand.1 > bounds.1 .1 {
+            if stop_out_of_wall_bounds && sand.1 > *self.wall_bounds.1.end() {
                 // fell out of the world
                 return true;
             }
@@ -74,7 +116,7 @@ impl<'a> SandSimulator<'a> {
             {
                 sand = *next;
             } else {
-                self.settled.push(sand);
+                self.settled.insert(sand);
                 break;
             }
         }
@@ -83,42 +125,47 @@ impl<'a> SandSimulator<'a> {
     }
 
     fn point_is_blocked(&self, point: (usize, usize)) -> bool {
-        self.point_is_wall(point) || self.settled.contains(&point) || point.1 == self.floor_y()
+        self.point_is_wall(point) || point.1 == self.floor_y() || self.settled.contains(&point)
     }
 
     fn point_is_wall(&self, point: (usize, usize)) -> bool {
-        self.walls.iter().any(|wall| {
-            wall.windows(2)
-                .map(|wd| {
-                    (
-                        (wd[0].0.min(wd[1].0)..=wd[1].0.max(wd[0].0)),
-                        (wd[0].1.min(wd[1].1)..=wd[1].1.max(wd[0].1)),
-                    )
-                })
-                .any(|line| line.0.contains(&point.0) && line.1.contains(&point.1))
-        })
+        self.wall_bounds.0.contains(&point.0)
+            && self.wall_bounds.1.contains(&point.1)
+            && self.obstacle_map[self.obstacle_map_index(point)]
     }
 
-    fn wall_bounds(&self) -> ((usize, usize), (usize, usize)) {
-        self.walls.iter().fold(
-            ((usize::MAX, usize::MIN), (usize::MAX, usize::MIN)),
-            |acc, line| {
-                line.iter().fold(acc, |acc, point| {
-                    (
-                        (acc.0 .0.min(point.0), acc.0 .1.max(point.0)),
-                        (acc.1 .0.min(point.1), acc.1 .1.max(point.1)),
-                    )
-                })
-            },
-        )
+    fn obstacle_map_index(&self, point: (usize, usize)) -> usize {
+        calc_obstacle_map_index(self.obstacle_map_size, &self.wall_bounds, point)
     }
 
     fn floor_y(&self) -> usize {
-        self.wall_bounds().1 .1 + FLOOR_OFFSET
+        self.wall_bounds.1.end() + FLOOR_OFFSET
     }
 }
 
-pub fn parse_input(input: &str) -> Lines {
+fn calc_obstacle_map_index(
+    size: (usize, usize),
+    wall_bounds: &(RangeInclusive<usize>, RangeInclusive<usize>),
+    point: (usize, usize),
+) -> usize {
+    size.0 * (point.1 - wall_bounds.1.start()) + point.0 - wall_bounds.0.start()
+}
+
+fn wall_bounds(walls: &[Vec<(usize, usize)>]) -> ((usize, usize), (usize, usize)) {
+    walls.iter().fold(
+        ((usize::MAX, usize::MIN), (usize::MAX, usize::MIN)),
+        |acc, line| {
+            line.iter().fold(acc, |acc, point| {
+                (
+                    (acc.0 .0.min(point.0), acc.0 .1.max(point.0)),
+                    (acc.1 .0.min(point.1), acc.1 .1.max(point.1)),
+                )
+            })
+        },
+    )
+}
+
+pub fn parse_input(input: &str) -> Vec<Vec<(usize, usize)>> {
     input
         .lines()
         .map(|line| {
@@ -134,34 +181,64 @@ pub fn parse_input(input: &str) -> Lines {
         .collect::<Vec<_>>()
 }
 
-pub fn part1(walls: &Lines) -> usize {
+pub fn part1(walls: &[Vec<(usize, usize)>]) -> usize {
+    simulate(walls, true, SimOptions::new())
+}
+
+pub fn part2(walls: &[Vec<(usize, usize)>]) -> usize {
+    simulate(walls, false, SimOptions::new())
+}
+
+fn simulate(walls: &[Vec<(usize, usize)>], overflow: bool, options: SimOptions) -> usize {
     let mut sim = SandSimulator::new(walls);
     let mut counter = 0;
 
-    //sim.render(&mut std::io::stdout()).unwrap();
+    if options.print_start {
+        sim.render(&mut std::io::stdout()).unwrap();
+    }
 
-    while !sim.drop_sand(true) {
+    while !sim.drop_sand(overflow) {
         counter += 1;
-        //sim.render(&mut std::io::stdout()).unwrap();
+        if options.print_steps {
+            sim.render(&mut std::io::stdout()).unwrap();
+        }
+    }
+
+    if options.print_result {
+        sim.render(&mut std::io::stdout()).unwrap();
     }
 
     counter
 }
 
-pub fn part2(walls: &Lines) -> usize {
-    let mut sim = SandSimulator::new(walls);
-    let mut counter = 0;
+struct SimOptions {
+    print_start: bool,
+    print_steps: bool,
+    print_result: bool,
+}
 
-    //sim.render(&mut std::io::stdout()).unwrap();
+// a builder pattern.. just for fun
 
-    while !sim.drop_sand(false) {
-        counter += 1;
-        //sim.render(&mut std::io::stdout()).unwrap();
+macro_rules! builder_option {
+    ($field:ident, $type:ident) => {
+        pub fn $field(self, $field: $type) -> Self {
+            Self { $field, ..self }
+        }
+    };
+}
+
+impl SimOptions {
+    pub fn new() -> Self {
+        Self {
+            print_start: false,
+            print_steps: false,
+            print_result: false,
+        }
     }
 
-    //sim.render(&mut std::io::stdout()).unwrap();
-
-    counter
+    builder_option!(print_start, bool);
+    builder_option!(print_steps, bool);
+    builder_option!(print_result, bool);
 }
 
 #[cfg(test)]
