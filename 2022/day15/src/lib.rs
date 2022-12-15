@@ -1,9 +1,10 @@
-use std::str::FromStr;
+use std::{ops::RangeInclusive, str::FromStr};
 
 #[derive(Debug)]
 pub struct Sensor {
     position: (isize, isize),
     closest_beacon: (isize, isize),
+    range: isize,
 }
 
 impl FromStr for Sensor {
@@ -18,18 +19,19 @@ impl FromStr for Sensor {
         let (sensor_y, rem) = rem.split_once(": closest beacon is at x=").unwrap();
         let (beacon_x, beacon_y) = rem.split_once(", y=").unwrap();
 
+        let position = (sensor_x.parse().unwrap(), sensor_y.parse().unwrap());
+        let closest_beacon = (beacon_x.parse().unwrap(), beacon_y.parse().unwrap());
+        let range = position.manhattan_distance_to(&closest_beacon);
+
         Ok(Self {
-            position: (sensor_x.parse().unwrap(), sensor_y.parse().unwrap()),
-            closest_beacon: (beacon_x.parse().unwrap(), beacon_y.parse().unwrap()),
+            position,
+            closest_beacon,
+            range,
         })
     }
 }
 
-impl Sensor {
-    fn range(&self) -> isize {
-        self.position.manhattan_distance_to(&self.closest_beacon)
-    }
-}
+impl Sensor {}
 
 pub fn parse_input(input: &str) -> Vec<Sensor> {
     input.lines().map(|line| line.parse().unwrap()).collect()
@@ -38,16 +40,16 @@ pub fn parse_input(input: &str) -> Vec<Sensor> {
 pub fn part1(sensors: &[Sensor], y: isize) -> usize {
     let leftmost = sensors
         .iter()
-        .fold(isize::MAX, |acc, s| acc.min(s.position.0 - s.range()));
+        .fold(isize::MAX, |acc, s| acc.min(s.position.0 - s.range));
     let rightmost = sensors
         .iter()
-        .fold(isize::MIN, |acc, s| acc.max(s.position.0 + s.range()));
+        .fold(isize::MIN, |acc, s| acc.max(s.position.0 + s.range));
 
     let mut count = 0;
 
     for x in leftmost..=rightmost {
         if sensors.iter().any(|sensor| {
-            sensor.position.manhattan_distance_to(&(x, y)) <= sensor.range()
+            sensor.position.manhattan_distance_to(&(x, y)) <= sensor.range
                 && sensor.closest_beacon != (x, y)
         }) {
             count += 1;
@@ -55,6 +57,44 @@ pub fn part1(sensors: &[Sensor], y: isize) -> usize {
     }
 
     count
+}
+
+pub fn part2(
+    sensors: &[Sensor],
+    search_space: (RangeInclusive<isize>, RangeInclusive<isize>),
+) -> usize {
+    let mut beacon = None::<(isize, isize)>;
+
+    'outer: for sensor in sensors {
+        // walk around the edge of each sensors max range to reduce the number of
+        // possible locations from 16,000,000,000,000 to about 55,746,600
+        for dir in [(1, 0), (-1, 0), (0, 1), (1, 0)] {
+            let range = sensor.range + 1;
+
+            for i in 0..=range {
+                let p = (
+                    sensor.position.0 + range * dir.0 - i,
+                    sensor.position.1 + range * dir.1 - i,
+                );
+                if search_space.0.contains(&p.0)
+                    && search_space.1.contains(&p.1)
+                    && sensors.iter().all(|sensor| {
+                        sensor.closest_beacon != p
+                            && sensor.position.manhattan_distance_to(&p) > sensor.range
+                    })
+                {
+                    beacon = Some(p);
+                    break 'outer;
+                }
+            }
+        }
+    }
+
+    if let Some(beacon) = beacon {
+        (beacon.0 * 4000000 + beacon.1) as usize
+    } else {
+        panic!("Couldn't find the distress signal beacon!");
+    }
 }
 
 trait ManhattanDistance {
@@ -92,6 +132,14 @@ Sensor at x=20, y=1: closest beacon is at x=15, y=3";
 
     #[test]
     fn test_example_input_part1() {
-        assert_eq!(part1(&dbg!(parse_input(EXAMPLE_INPUT)), 10), 26);
+        assert_eq!(part1(&parse_input(EXAMPLE_INPUT), 10), 26);
+    }
+
+    #[test]
+    fn test_example_input_part2() {
+        assert_eq!(
+            part2(&parse_input(EXAMPLE_INPUT), (0..=20, 0..=20)),
+            56000011
+        );
     }
 }
