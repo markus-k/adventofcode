@@ -68,7 +68,7 @@ pub fn part2(
     'outer: for sensor in sensors {
         // walk around the edge of each sensors max range to reduce the number of
         // possible locations from 16,000,000,000,000 to about 55,746,600
-        for dir in [(1, 0), (-1, 0), (0, 1), (1, 0)] {
+        for dir in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
             let range = sensor.range + 1;
 
             for i in 0..=range {
