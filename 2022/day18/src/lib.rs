@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Point3D(isize, isize, isize);
+pub struct Point3D(i8, i8, i8);
 
 impl Point3D {
     pub fn is_adjacent(&self, other: &Point3D) -> bool {
@@ -63,11 +63,7 @@ pub fn part2(cubes: &[Point3D]) -> usize {
     grid.extend(cubes.iter().cloned());
 
     let lava_bounds = grid.iter().fold(
-        (
-            (isize::MAX, isize::MIN),
-            (isize::MAX, isize::MIN),
-            (isize::MAX, isize::MIN),
-        ),
+        ((i8::MAX, i8::MIN), (i8::MAX, i8::MIN), (i8::MAX, i8::MIN)),
         |acc, cube| {
             (
                 (acc.0 .0.min(cube.0), acc.0 .1.max(cube.0)),
