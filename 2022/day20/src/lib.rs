@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 pub fn part1(input: &str) -> i64 {
     decrypt(input, 1, 1)
 }
@@ -12,7 +14,7 @@ fn decrypt(input: &str, key: i64, rounds: usize) -> i64 {
         .map(|line| line.parse::<i64>().unwrap())
         .collect::<Vec<_>>();
 
-    let mut indices = (0..original_numbers.len()).collect::<Vec<_>>();
+    let mut indices = (0..original_numbers.len()).collect::<VecDeque<_>>();
 
     for _round in 0..rounds {
         for i in 0..original_numbers.len() {
@@ -21,7 +23,7 @@ fn decrypt(input: &str, key: i64, rounds: usize) -> i64 {
             let num = original_numbers[i] * key;
 
             let ir = indices.remove(pos);
-            assert_eq!(ir, i);
+            assert_eq!(ir, Some(i));
 
             let new_index = (pos as i64 + num).rem_euclid(original_numbers.len() as i64 - 1);
             // dbg!(new_index, num);
