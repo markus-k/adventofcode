@@ -24,11 +24,33 @@ fn parse_input_part1(input: &str) -> u64 {
 }
 
 fn parse_input_part2(input: &str) -> u64 {
-    let _digits = [
-        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    let digits = [
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "one", "two", "three", "four", "five", "six",
+        "seven", "eight", "nine",
     ];
 
-    input.lines().into_iter().map(|_line| 0).sum()
+    input
+        .lines()
+        .into_iter()
+        .map(|line| {
+            let matches = digits
+                .iter()
+                .map(|digit| line.match_indices(digit))
+                .flatten()
+                .collect::<Vec<_>>();
+
+            if let Some((first, second)) = matches
+                .iter()
+                .min_by_key(|m| m.0)
+                .zip(matches.iter().max_by_key(|m| m.0))
+            {
+                10u64 * (digits.iter().position(|&s| s == first.1).unwrap() % 9 + 1) as u64
+                    + (digits.iter().position(|&s| s == second.1).unwrap() % 9 + 1) as u64
+            } else {
+                0
+            }
+        })
+        .sum()
 }
 
 #[cfg(test)]
