@@ -1,7 +1,8 @@
 fn main() {
     let input = include_str!("../input.txt");
 
-    println!("{}", parse_input(input));
+    println!("part1 = {}", part1(input));
+    println!("part2 = {}", part2(input));
 }
 
 fn parse_game_line(line: &str) -> (usize, Vec<(usize, usize, usize)>) {
@@ -27,26 +28,40 @@ fn parse_game_line(line: &str) -> (usize, Vec<(usize, usize, usize)>) {
     )
 }
 
-fn parse_input(input: &str) -> usize {
+fn part1(input: &str) -> usize {
     let max_cubes = (12, 13, 14);
 
     input
         .lines()
         .map(parse_game_line)
         .filter_map(|game| {
-            let game_max = game.1.iter().fold((0, 0, 0), |total, game| {
-                (
-                    total.0.max(game.0),
-                    total.1.max(game.1),
-                    total.2.max(game.2),
-                )
-            });
+            let game_max = game
+                .1
+                .into_iter()
+                .reduce(|acc, game| (acc.0.max(game.0), acc.1.max(game.1), acc.2.max(game.2)))
+                .unwrap();
 
             if game_max.0 <= max_cubes.0 && game_max.1 <= max_cubes.1 && game_max.2 <= max_cubes.2 {
                 Some(game.0)
             } else {
                 None
             }
+        })
+        .sum()
+}
+
+fn part2(input: &str) -> usize {
+    input
+        .lines()
+        .map(parse_game_line)
+        .map(|game| {
+            let game_min = game
+                .1
+                .into_iter()
+                .reduce(|acc, game| (acc.0.max(game.0), acc.1.max(game.1), acc.2.max(game.2)))
+                .unwrap();
+
+            game_min.0 * game_min.1 * game_min.2
         })
         .sum()
 }
@@ -63,6 +78,11 @@ Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
 
     #[test]
     fn test_part1() {
-        assert_eq!(parse_input(EXAMPLE_INPUT), 8);
+        assert_eq!(part1(EXAMPLE_INPUT), 8);
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(EXAMPLE_INPUT), 2286);
     }
 }
